@@ -1,5 +1,7 @@
 ﻿using LiveCharts.Wpf;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,11 +18,9 @@ namespace VityazevFinalWork.Solution
         private readonly List<TData> _data;
         private readonly CartesianChart _chart, _korChart, _modelChart;
 
-        public Main(RichTextBox richTextBox, string excelFilePath, CartesianChart chart, CartesianChart korChart, CartesianChart modelChart)
+        public Main(RichTextBox richTextBox, CartesianChart chart, CartesianChart korChart, CartesianChart modelChart)
         {
             _logsBox = richTextBox;
-            //_data = ExcelReader.ReadExcel(excelFilePath);
-            //_data = ExcelReader.MakeLegitData(_data);
             _data = ExcelReader.ReadBigExcel();
             _chart = chart;
             _korChart = korChart;
@@ -42,14 +42,12 @@ namespace VityazevFinalWork.Solution
 
         private void MainWorker()
         {
-            //ExcelReader.ReadBigExcel();
             print("1. Анализ характеристик объекта исследования", true);
             
             var sp = new Specifications(_data, _chart);
             print($"Среднее = {sp.Mean()}");
             print($"Медиана = {sp.Median()}");
             print($"Стандартное отклонение = {sp.StandardDeviation()}");
-            print($"Мода = {sp.Mode()}");
             print($"Диспесрсия = {sp.Variance()}");
             print($"Минимум = {sp.MinMax().Item1}");
             print($"Максимум = {sp.MinMax().Item2}");
@@ -61,21 +59,25 @@ namespace VityazevFinalWork.Solution
             print("2. Моделирование статистических зависимостей", true);
             var dp = new Dependencies(_data);
             print($"Шапиро-Вилк тест PValue: {dp.lib_ShapiroWilkTest().p}");
-            //print($"Колмогорова-Смирнова тест PValue: {dp.lib_KolmogorovSmirnovTest().p}");
             print($"Андерсон-Дарлинг тест Pvalue: {dp.lib_AndersonDarlingTest().p}");
             dp.lib_AutoCorelation(_korChart);
 
-            var ml = new SSAmodel(_data);
-            ml.Train();
-            ml.Predict();
-            ml.TestModel(_modelChart);
+            
+            var ssa = new SSAmodel(_data);
+            ssa.Train();
+            var ssaPredict =  ssa.Predict();
+            var mae = ssa.TestModel(_modelChart);
 
             var rm = new RegressionModel(_data);
             rm.TrainAll();
             rm.PredictAll(_data[0].date);
             rm.PredictAll(_data[_data.Count - 1].date);
             rm.TestModels(_modelChart);
-            rm.TrainPoisson();
+
+            print("4. Модель SSA", true);
+            print($"Предсказанные значения на 11 месяцев: {string.Join(' ', ssaPredict)}");
+            print($"Реальные значения на 11 месяцев: {string.Join(' ', _data.TakeLast(11).ToArray().Select(d=>Math.Round( d.amount)).ToArray())}");
+            print($"MAE = {mae}");
         }
 
 

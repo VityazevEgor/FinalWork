@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using VityazevFinalWork.Solution.Misc;
 using VityazevFinalWork.Solution.Models;
 
 namespace VityazevFinalWork.Solution.Modules
@@ -14,13 +13,13 @@ namespace VityazevFinalWork.Solution.Modules
     internal class SSAmodel
     {
         private readonly List<MTData> _data;
+        private readonly List<MTData> _testData;
         private readonly MLContext _context;
 
         public SsaForecastingTransformer? _model;
 
         public class MTData
         {
-            //public required DateTime date { get; set; }
             public float amount;
             public MTData(float value)
             {
@@ -43,6 +42,8 @@ namespace VityazevFinalWork.Solution.Modules
             {
                 _data.Add(new MTData(Convert.ToSingle(d.amount)));
             });
+            _testData = _data.TakeLast(11).ToList();
+            _data = _data.Take(_data.Count-11).ToList();
             _context = new MLContext();
         }
 
@@ -50,12 +51,12 @@ namespace VityazevFinalWork.Solution.Modules
         {
             var dataView = _context.Data.LoadFromEnumerable(_data);
 
-            // Создайте конвейер
+            // Создаю конвейер
             var pipeline = _context.Forecasting.ForecastBySsa(
                 outputColumnName: "ForecastedAmount",
                 inputColumnName: "amount",
                 windowSize: 11, // количество месяцев 
-                seriesLength: 11*2+1, // Общее количество месяцев 
+                seriesLength: 11*2+1,
                 trainSize: _data.Count,
                 horizon: 11,
                 confidenceLevel: 0.9f,
@@ -63,7 +64,7 @@ namespace VityazevFinalWork.Solution.Modules
                 confidenceUpperBoundColumn: "ConfidenceUpperBound"
                 );
 
-            // Обучите модель
+            // Обучение модели
             _model = pipeline.Fit(dataView);
         }
 
@@ -73,41 +74,36 @@ namespace VityazevFinalWork.Solution.Modules
             var forecastEngine = _model.CreateTimeSeriesEngine<MTData, TDataForecast>(_context);
             var forecast = forecastEngine.Predict();
             Debug.WriteLine($"Предикт на 11 месяцев: {string.Join(", ", forecast.ForecastedAmount)}");
-            Debug.WriteLine($"Реальные данные на 11 месяцев: {string.Join(", ", ExcelReader.ReadTestData().Select(d => d.amount).ToArray())}");
-            //Debug.WriteLine($"Нижняя граница: {string.Join(" ", forecast.ConfidenceLowerBound)}");
+            Debug.WriteLine($"Реальные данные на 11 месяцев: {string.Join(", ", _testData)}");
             return forecast.ForecastedAmount;
         }
 
-        public void TestModel(CartesianChart? chart = null)
+        public float TestModel(CartesianChart? chart = null)
         {
-            var testData = new List<MTData>();
-            ExcelReader.ReadTestData().ForEach(data => { testData.Add(new MTData((float)data.amount)); });
             var forecastEngine = _model.CreateTimeSeriesEngine<MTData, TDataForecast>(_context);
             float[]? prediction = forecastEngine.Predict().ForecastedAmount;
-
-            // Вычислите среднюю абсолютную ошибку (MAE)
-            var mae = prediction.Zip(testData.Select(x => x.amount), (forecast, actual) => Math.Abs(forecast - actual)).Average();
+            var mae = prediction.Zip(_testData.Select(x => x.amount), (forecast, actual) => Math.Abs(forecast - actual)).Average();
+            Debug.WriteLine($"---SSA---");
             Debug.WriteLine($"MAE = {mae}");
 
             if (chart  != null)
             {
                 chart.Dispatcher.Invoke(() => { 
-                    var actualValues = new ChartValues<double>(testData.Select(x => (double)x.amount));
+                    var actualValues = new ChartValues<double>(_testData.Select(x => (double)x.amount));
                     var predictedValues = new ChartValues<double>(prediction.Select(x => (double)x));
                     var lowerBoundValues = new ChartValues<double>(forecastEngine.Predict().ConfidenceLowerBound.Select(x => (double)x));
 
-                    var actualSeries = new ScatterSeries { Title = "Actual", Values = actualValues, MinPointShapeDiameter = 20 };
+                    var actualSeries = new LineSeries { Title = "Actual", Values = actualValues};
                     var predictedSeries = new LineSeries { Title = "SSA", Values = predictedValues };
-                    //var lowerBoundSeies = new LineSeries { Title = "Lower bound", Values = lowerBoundValues };
 
                     chart.Series = new SeriesCollection { actualSeries, predictedSeries };
                     chart.AxisX.Add(new Axis { Title = "Time" });
                     chart.AxisY.Add(new Axis { Title = "Value" });
                 });
             }
+
+            return mae;
         }
-
-
 
     }
 }

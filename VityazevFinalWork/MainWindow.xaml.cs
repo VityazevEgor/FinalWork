@@ -27,7 +27,7 @@ namespace VityazevFinalWork
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-            _main = new Main(richLogsBox, @"D:\Учёба\Прикладной статистический анализ\FinalWork\02_01_All_Borrowers_info.xlsx", cartesianChart, korChart, modelChart);
+            _main = new Main(richLogsBox, cartesianChart, korChart, modelChart);
             _main.Run(true);
         }
     }

@@ -27,15 +27,6 @@ namespace VityazevFinalWork.Solution.Modules
             return (test.Statistic, test.PValue);
         }
 
-        public (double w, double p) lib_KolmogorovSmirnovTest()
-        {
-            var sp = new Specifications(_data, null);
-
-            var test = new KolmogorovSmirnovTest(sp.GetNormolizedData(), new Accord.Statistics.Distributions.Univariate.NormalDistribution());
-
-            return (test.Statistic, test.PValue);
-        }
-
         public (double w, double p) lib_AndersonDarlingTest()
         {
             var sp = new Specifications(_data, null);
@@ -72,7 +63,6 @@ namespace VityazevFinalWork.Solution.Modules
                     chart.AxisY.Add(new Axis { Title = "Значение АФК", FontSize=15 });
                 });
             }
-            //File.WriteAllText("autoCor.txt", string.Join(' ', acf));
             return acf;
         }
 
